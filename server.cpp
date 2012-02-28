@@ -24,6 +24,8 @@ EventBase* initLibEvent(const char* method);
 evutil_socket_t listenSock(const int port);
 void runServer(EventBase* eb, const int port, const int numWorkerThreads, 
         const int maxQueueSize);
+void runThreadServer(const int port, const int threads, const int queue);
+
 
 /**
  * A server intended to test the differences in efficiency between the various
@@ -69,8 +71,8 @@ int main(int argc, char** argv)
     }
 
     port = vm["port"].as<int>();
-    port = vm["thread-pool"].as<int>();
-    port = vm["max-queue"].as<int>();
+    threads = vm["thread-pool"].as<int>();
+    queue = vm["max-queue"].as<int>();
     
     if (vm.count("help"))
     {
@@ -95,7 +97,7 @@ int main(int argc, char** argv)
     }
     else if (vm.count("threads"))
     {
-        //runThreadServer(port, threads, queue);
+        runThreadServer(port, threads, queue);
     }
     else
     {
@@ -151,13 +153,11 @@ EventBase* initLibEvent(const char* method)
 
 void handleSigint(evutil_socket_t, short, void* arg)
 {
-    evutil_socket_t listenSock = *(int*) arg;
-    close(listenSock);
+    evconnlistener_free((struct evconnlistener*) arg);
 	exit(0);
 }
 
-static void
-sockEvent(struct bufferevent* bev, short events, void*)
+static void sockEvent(struct bufferevent* bev, short events, void*)
 {
     if (events & BEV_EVENT_ERROR)
     {
@@ -245,7 +245,7 @@ void runServer(EventBase* eb, const int port, const int numWorkerThreads,
         exit(1);
     }
 
-    if (!(listener = evconnlistener_new_bind(eb->getBase(), acceptClient, NULL, 
+    if (!(listener = evconnlistener_new_bind(eb->getBase(), acceptClient, pool, 
             LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE, LISTEN_BACKLOG, 
             (struct sockaddr*) &addr, sizeof(addr))))
     {
@@ -254,18 +254,14 @@ void runServer(EventBase* eb, const int port, const int numWorkerThreads,
     }
     evconnlistener_set_error_cb(listener, acceptErr);
 
-    //evutil_socket_t fd = listenSock(port);
-    //struct event* event;
-    //struct event* sigint;
-    //event_base_dump_events(eb->getBase(), stderr);
+    struct event* sigint;
+    sigint = evsignal_new(eb->getBase(), SIGINT, handleSigint, listener);
+    evsignal_add(sigint, NULL);
 
-    //event_base_dump_events(eb->getBase(), stderr);
-    //event_add(event, NULL);
-    //sigint = evsignal_new(eb->getBase(), SIGINT, handleSigint, &fd);
-    //evsignal_add(sigint, NULL);
-    //event_base_dump_events(eb->getBase(), stderr);
     event_base_dispatch(eb->getBase());
-    std::cerr << "AHHHH";
-    //event_del(event);
-    //event_del(sigint);
+    event_del(sigint);
+}
+
+void runThreadServer(const int port, const int threads, const int queue)
+{
 }
