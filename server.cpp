@@ -29,12 +29,18 @@ void runServer(EventBase* eb, const int port, const int numWorkerThreads,
         const int maxQueueSize);
 void runServerTh(const int port, const int numWorkerThreads, 
         const int maxQueueSize);
+void incrementClients();
+void decrementClients();
 
 struct readArgs
 {
     struct bufferevent* bev;
     tPool* pool;  
 };
+
+pthread_mutex_t clientCountMutex;
+int clientCount;
+int maxClientCount;
 
 /**
  * A server intended to test the differences in efficiency between the various
@@ -82,6 +88,13 @@ int main(int argc, char** argv)
     port = vm["port"].as<int>();
     threads = vm["thread-pool"].as<int>();
     queue = vm["max-queue"].as<int>();
+    
+    if (pthread_mutex_init(&clientCountMutex, NULL))
+    {
+        std::cerr << "Error creating mutex\n";
+    }
+    clientCount = 0;
+    maxClientCount = 0;
     
     if (vm.count("help"))
     {
@@ -135,7 +148,7 @@ EventBase* initLibEvent(const char* method)
     {
         EventBase* eb = new EventBase(method);
 #ifdef DEBUG
-        std::cerr << "Using: " << eb->getMethod() << "\n";
+        std::cout << "Using: " << eb->getMethod() << "\n";
 #endif
         return eb;
     }
@@ -160,10 +173,17 @@ EventBase* initLibEvent(const char* method)
     }
 }
 
+void shutDown(int)
+{
+    std::cout << "\nHighest number of simultaneous connections: " 
+              << maxClientCount << "\n";
+	exit(0);
+}
+
 void handleSigint(evutil_socket_t, short, void* arg)
 {
     evconnlistener_free((struct evconnlistener*) arg);
-	exit(0);
+    shutDown(0);
 }
 
 static void sockEvent(struct bufferevent* bev, short events, void*)
@@ -175,6 +195,7 @@ static void sockEvent(struct bufferevent* bev, short events, void*)
     if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) 
     {
         bufferevent_free(bev);
+        decrementClients();
     }
 }
 
@@ -188,9 +209,7 @@ void handleRequest(void* args)
     {
         std::cerr << "Error: evbuffer_copyout\n";
     }
-#ifdef DEBUG
-    std::cerr << "msgsize: " << msgSize << "\n";
-#endif
+
     char* buf = new char[msgSize];
 
     // fill the packet with random characters
@@ -224,7 +243,8 @@ static void acceptErr(struct evconnlistener* listener, void*)
 static void acceptClient(struct evconnlistener* listener, evutil_socket_t fd,
         struct sockaddr*, int, void* arg)
 {
-    // new connection
+    incrementClients();
+
     struct event_base* base = evconnlistener_get_base(listener);
     struct bufferevent* bev = bufferevent_socket_new(base, fd, 
             BEV_OPT_CLOSE_ON_FREE);
@@ -287,9 +307,7 @@ void readSockTh(void* args)
                 + ((readBuf[2] << 16) & 0x00FF0000)
                 + ((readBuf[1] <<  8) & 0x0000FF00)
                 + ( readBuf[0]        & 0x000000FF);
-#ifdef DEBUG
-        std::cerr << "msgsize: " << msgSize << "\n";
-#endif
+
         char* writeBuf = new char[msgSize];
 
         // fill the packet with random characters
@@ -302,6 +320,7 @@ void readSockTh(void* args)
 
         delete writeBuf;
     }
+    decrementClients();
     delete fd;
 }
 
@@ -334,6 +353,8 @@ evutil_socket_t acceptClientTh(evutil_socket_t fd)
         perror("accept");
     }
     setUpSocket(fdNew);
+    
+    incrementClients();
 
     return fdNew;
 }
@@ -341,6 +362,7 @@ evutil_socket_t acceptClientTh(evutil_socket_t fd)
 void runServerTh(const int port, const int numWorkerThreads,
         const int maxQueueSize)
 {
+    std::cout << "Add Client: " << clientCount << "\n";
 	struct sockaddr_in addr;
     evutil_socket_t fd;
 
@@ -355,6 +377,21 @@ void runServerTh(const int port, const int numWorkerThreads,
     if (tPoolInit(&pool, numWorkerThreads, maxQueueSize, blockWhenQueueFull))
     {
         std::cerr << "Error initializing thread pool\n";
+        exit(1);
+    }        
+	
+    struct sigaction sigint;
+    sigint.sa_handler = shutDown;
+    sigint.sa_flags = 0;
+
+    if (sigemptyset(&sigint.sa_mask) == -1)
+    {
+        perror ("sigemptyset(); sigaction();");
+        exit(1);
+    }
+    if (sigaction(SIGINT, &sigint, NULL) == -1)
+    {
+        perror ("sigemptyset(); sigaction();");
         exit(1);
     }
 
@@ -388,4 +425,27 @@ void runServerTh(const int port, const int numWorkerThreads,
             exit(1);
         }
     }
+}
+
+void incrementClients() 
+{
+    pthread_mutex_lock(&clientCountMutex);
+    if (++clientCount > maxClientCount)
+    {
+        maxClientCount = clientCount;
+    }
+#ifdef DEBUG
+    std::cout << "Clients++ " << clientCount << "\n";
+#endif
+    pthread_mutex_unlock(&clientCountMutex);
+}
+
+void decrementClients() 
+{
+    pthread_mutex_lock(&clientCountMutex);
+    clientCount--;
+#ifdef DEBUG
+    std::cout << "Clients-- " << clientCount << "\n";
+#endif
+    pthread_mutex_unlock(&clientCountMutex);
 }

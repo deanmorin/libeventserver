@@ -5,7 +5,9 @@
 #include <iostream>
 #include <netdb.h>
 #include <stdio.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <string>
 #include <vector>
@@ -37,7 +39,6 @@ void* requestData(void* args)
     int sock;
     struct sockaddr_in server;
     struct hostent* hp;
-    sleep(1);
 
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) == -1)
     {
@@ -102,6 +103,13 @@ void runClients(struct clientArgs* args, int clients)
 {
     std::vector<pthread_t> threads;
     threads.resize(clients);
+    struct rlimit rlim;
+
+    // increase allowed threads per process
+    getrlimit(RLIMIT_NPROC, &rlim);
+    rlim.rlim_cur = rlim.rlim_max;
+    setrlimit(RLIMIT_NPROC, &rlim);
+
     int rtn = 0;
     int i = 0;
     
@@ -143,7 +151,7 @@ int main(int argc, char** argv)
          "length of packets to request")
         ("message-count,c", po::value<int>(&opt)->default_value(25), 
          "number of packets to request")
-        ("clients,x", po::value<int>(&opt)->default_value(512), 
+        ("clients,x", po::value<int>(&opt)->default_value(250), 
          "number of clients to create")
         ("help", "show this message")
     ;
