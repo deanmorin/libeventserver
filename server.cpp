@@ -147,9 +147,7 @@ EventBase* initLibEvent(const char* method)
     try
     {
         EventBase* eb = new EventBase(method);
-#ifdef DEBUG
         std::cout << "Using: " << eb->getMethod() << "\n";
-#endif
         return eb;
     }
     catch (const BadBaseException& e)
@@ -176,7 +174,7 @@ EventBase* initLibEvent(const char* method)
 void shutDown(int)
 {
     std::cout << "\nHighest number of simultaneous connections: " 
-              << maxClientCount << "\n";
+              << maxClientCount << "\n\n";
 	exit(0);
 }
 
@@ -362,7 +360,6 @@ evutil_socket_t acceptClientTh(evutil_socket_t fd)
 void runServerTh(const int port, const int numWorkerThreads,
         const int maxQueueSize)
 {
-    std::cout << "Add Client: " << clientCount << "\n";
 	struct sockaddr_in addr;
     evutil_socket_t fd;
 

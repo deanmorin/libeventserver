@@ -16,6 +16,8 @@
 namespace po = boost::program_options;
 using namespace dm;
 
+double secondsDiff(const timeval& val1, const timeval& val2);
+
 struct clientArgs {
     std::string host;
     int port;
@@ -83,6 +85,13 @@ void* requestData(void* args)
     flag = MSG_NOSIGNAL;
 #endif
 
+    struct timeval startTime;
+    if (gettimeofday(&startTime, NULL) == -1)
+    {
+        perror("gettimeofday()");
+        exit(1);
+    }
+
     // transmit request and receive packets
     for (i = 0; i < ca->count; i++)
     {
@@ -95,8 +104,21 @@ void* requestData(void* args)
     }
     close(sock);
 
+    struct timeval endTime;
+    if (gettimeofday(&endTime, NULL) == -1)
+    {
+        perror("gettimeofday()");
+        exit(1);
+    }
+
+    double* timeToComplete = new double();
+    *timeToComplete = secondsDiff(startTime, endTime);
+#ifdef DEBUG
+    std::cout << *timeToComplete << "\n";
+#endif
+
     delete responseMsg;
-    return NULL;
+    return timeToComplete;
 }
 
 void runClients(struct clientArgs* args, int clients) 
@@ -112,6 +134,9 @@ void runClients(struct clientArgs* args, int clients)
 
     int rtn = 0;
     int i = 0;
+    double* timeToComplete = 0;
+    double totalTime = 0;
+    double averageTime = 0;
     
     for (i = 0; i < clients; i++)
     {
@@ -128,11 +153,12 @@ void runClients(struct clientArgs* args, int clients)
     }
     for (i = 0; i < clients; i++)
     {
-        pthread_join(threads[i], NULL);
+        pthread_join(threads[i], (void**) &timeToComplete);
+        totalTime += *timeToComplete;
+        delete timeToComplete;
     }
-#ifdef DEBUG
-    std::cerr << "Finished\n";
-#endif
+    averageTime = totalTime / i;
+    std::cout << "Average connection time: " << averageTime << " seconds\n\n";
 }
 
 int main(int argc, char** argv)
@@ -193,4 +219,20 @@ int main(int argc, char** argv)
     delete args;
 
     return 0;
+}
+
+/**
+ * Finds the difference between val1 and val2 in seconds. Accurate to 
+ * microseconds.
+ * @return The difference in seconds.
+ * @author Dean Morin
+ */
+double secondsDiff(const timeval& val1, const timeval& val2)
+{
+    long sec1 = val1.tv_sec;
+    long sec2 = val2.tv_sec;
+    long usec1 = val1.tv_usec;
+    long usec2 = val2.tv_usec;
+
+    return abs(sec2 - sec1) + abs(usec2 - usec1) * pow(10, -6);
 }

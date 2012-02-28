@@ -5,7 +5,7 @@
 namespace dm
 {
 
-#define REQUEST_SIZE    16
+#define REQUEST_SIZE    66
 
 /**
  * Keep reading from the socket until bufsize bytes are read.
