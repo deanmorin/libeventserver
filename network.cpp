@@ -20,9 +20,14 @@ int clearSocket(int fd, char* buf, int bufsize)
                 perror("recv()");
                 exit(1);
             }
-            std::cerr << "DOES IT EVER HAPPEN?\n";
-            break;
+#ifdef DEBUG
+            perror("recv(): EAGAIN");
+#endif
         } 
+        else if (!read)
+        {
+            return -1; 
+        }
         bp += read;
         bytesToRead -= read;
     }

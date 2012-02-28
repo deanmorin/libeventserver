@@ -277,33 +277,32 @@ void runServer(EventBase* eb, const int port, const int numWorkerThreads,
  */
 void readSockTh(void* args)
 {
-    evutil_socket_t fd = *(evutil_socket_t*) args;
+    evutil_socket_t* fd = (evutil_socket_t*) args;
     char readBuf[REQUEST_SIZE];
     uint32_t msgSize;
 
-    clearSocket(fd, readBuf, REQUEST_SIZE);
-
-    std::cerr << readBuf << std::endl;
-    std::cerr << readBuf[0] << readBuf[1] << readBuf[2] << readBuf[3] << std::endl;
-
-    msgSize = (readBuf[3] << 24) & 0xFF000000
-            + (readBuf[2] << 16) & 0x00FF0000
-            + (readBuf[1] <<  8) & 0x0000FF00
-            +  readBuf[0]        & 0x000000FF;
-#ifdef DEBUG
-    std::cerr << "msgsize: " << msgSize << "\n";
-#endif
-    char* writeBuf = new char[msgSize];
-
-    // fill the packet with random characters
-    for (size_t i = 0; i < msgSize; i++)
+    while (clearSocket(*fd, readBuf, REQUEST_SIZE) != -1)
     {
-        writeBuf[i] = rand() % 93 + 33;
+        msgSize = ((readBuf[3] << 24) & 0xFF000000)
+                + ((readBuf[2] << 16) & 0x00FF0000)
+                + ((readBuf[1] <<  8) & 0x0000FF00)
+                + ( readBuf[0]        & 0x000000FF);
+#ifdef DEBUG
+        std::cerr << "msgsize: " << msgSize << "\n";
+#endif
+        char* writeBuf = new char[msgSize];
+
+        // fill the packet with random characters
+        for (size_t i = 0; i < msgSize; i++)
+        {
+            writeBuf[i] = rand() % 93 + 33;
+        }
+
+        send(*fd, writeBuf, msgSize, 0);
+
+        delete writeBuf;
     }
-
-    send(fd, writeBuf, msgSize, 0);
-
-    delete writeBuf;
+    delete fd;
 }
 
 /**
@@ -344,7 +343,6 @@ void runServerTh(const int port, const int numWorkerThreads,
 {
 	struct sockaddr_in addr;
     evutil_socket_t fd;
-    evutil_socket_t fdNew;
 
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
@@ -365,6 +363,9 @@ void runServerTh(const int port, const int numWorkerThreads,
 		perror("socket()");
 		exit(1);
 	}
+
+    setUpSocket(fd);
+
 	if (bind(fd, (struct sockaddr*) &addr, sizeof(addr)) == -1)
 	{
 		perror("bind()");
@@ -378,9 +379,10 @@ void runServerTh(const int port, const int numWorkerThreads,
 
     while (true)
     {
-        fdNew = acceptClientTh(fd);
-        
-        if (tPoolAddJob(pool, readSockTh, &fdNew))
+        evutil_socket_t* fdNew = new evutil_socket_t();
+        *fdNew = acceptClientTh(fd);
+
+        if (tPoolAddJob(pool, readSockTh, fdNew))
         {
             std::cerr << "Error adding new job to thread pool\n";
             exit(1);

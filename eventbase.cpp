@@ -30,13 +30,13 @@ EventBase::EventBase(const char* method)
         }
     }
     base_ = event_base_new_with_config(config);
-    event_base_get_method(base_);
-    event_config_free(config);
 
     if (!base_)
     {
         throw BadBaseException();
     }
+    event_base_get_method(base_);
+    event_config_free(config);
 }
 
 

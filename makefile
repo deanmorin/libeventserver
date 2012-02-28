@@ -5,7 +5,7 @@ compiler = g++
 flags = -W -Wall -pedantic
 dflags = -g -DDEBUG -DUSE_DEBUG
 inc = -I/usr/include/boost -I/usr/include
-lib = -lboost_program_options-mt
+lib = -lboost_program_options-mt -lpthread
 cmp = $(compiler) $(flags) $(inc) -c
 lnk = $(compiler) $(flags) $(lib) -o $(bin)
 objects = server.o eventbase.o network.o tpool.o
@@ -45,4 +45,4 @@ eventbase.o : eventbase.cpp eventbase.hpp network.hpp
 	$(cmp) eventbase.cpp
 
 clean :
-	rm $(server) $(client) $(objects)
+	rm $(server) $(client) *.o

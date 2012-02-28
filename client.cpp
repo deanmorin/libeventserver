@@ -44,6 +44,13 @@ void* requestData(void* args)
         perror("socket() could not create socket");
         exit(1);
     }
+    int arg = 1;
+    // set so port can be resused imemediately after ctrl-c
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &arg, sizeof(arg)) == -1) 
+    {
+        perror("setsockopt()");
+        exit(1);
+    }
 
     // set up address structure
     bzero((char*) &server, sizeof(struct sockaddr_in));
@@ -72,7 +79,7 @@ void* requestData(void* args)
         std::cerr << set << "\n";
     }
 #else
-    flag = MSG_NOSIGNAL
+    flag = MSG_NOSIGNAL;
 #endif
 
     // transmit request and receive packets
