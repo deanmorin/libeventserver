@@ -1,7 +1,6 @@
 #ifndef DM_EVENTBASE_HPP
 #define DM_EVENTBASE_HPP
 #include <event2/event.h>
-#include "badbaseexception.hpp"
 namespace dm {
 
 /**

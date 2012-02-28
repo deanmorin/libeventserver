@@ -1,5 +1,6 @@
 #ifndef DM_NETWORK_HPP
 #define DM_NETWORK_HPP
+#include <stdio.h>
 #include <sys/socket.h>
 namespace dm
 {

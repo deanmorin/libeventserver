@@ -8,7 +8,10 @@
 #include <fcntl.h>
 #include <iostream>
 #include <program_options.hpp>
+#include <signal.h>
+#include <stdio.h>
 #include <string>
+#include "badbaseexception.hpp"
 #include "eventbase.hpp"
 #include "network.hpp"
 #include "tpool.h"
@@ -221,7 +224,6 @@ static void acceptErr(struct evconnlistener* listener, void*)
 static void acceptClient(struct evconnlistener* listener, evutil_socket_t fd,
         struct sockaddr*, int, void* arg)
 {
-    std::cerr << "What's going on here\n";
     // new connection
     struct event_base* base = evconnlistener_get_base(listener);
     struct bufferevent* bev = bufferevent_socket_new(base, fd, 
@@ -281,10 +283,13 @@ void readSockTh(void* args)
 
     clearSocket(fd, readBuf, REQUEST_SIZE);
 
+    std::cerr << readBuf << std::endl;
+    std::cerr << readBuf[0] << readBuf[1] << readBuf[2] << readBuf[3] << std::endl;
+
     msgSize = (readBuf[3] << 24) & 0xFF000000
             + (readBuf[2] << 16) & 0x00FF0000
             + (readBuf[1] <<  8) & 0x0000FF00
-            +  readBuf[1]        & 0x000000FF;
+            +  readBuf[0]        & 0x000000FF;
 #ifdef DEBUG
     std::cerr << "msgsize: " << msgSize << "\n";
 #endif
@@ -331,7 +336,6 @@ evutil_socket_t acceptClientTh(evutil_socket_t fd)
     }
     setUpSocket(fdNew);
 
-    std::cerr << "got im himler\n";
     return fdNew;
 }
 
@@ -339,6 +343,8 @@ void runServerTh(const int port, const int numWorkerThreads,
         const int maxQueueSize)
 {
 	struct sockaddr_in addr;
+    evutil_socket_t fd;
+    evutil_socket_t fdNew;
 
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
@@ -354,11 +360,24 @@ void runServerTh(const int port, const int numWorkerThreads,
         exit(1);
     }
 
+    if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+	{
+		perror("socket()");
+		exit(1);
+	}
+	if (bind(fd, (struct sockaddr*) &addr, sizeof(addr)) == -1)
+	{
+		perror("bind()");
+		exit(1);
+	}
+    if (listen(fd, LISTEN_BACKLOG))
+    {
+        perror("listen()");
+        exit(1);
+    }
+
     while (true)
     {
-        evutil_socket_t fd;
-        //listen
-        evutil_socket_t fdNew;
         fdNew = acceptClientTh(fd);
         
         if (tPoolAddJob(pool, readSockTh, &fdNew))

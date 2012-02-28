@@ -1,13 +1,19 @@
+os := $(shell uname)
 server = server
 client = client
 compiler = g++
-flags = -W -Wall -pedantic -j8
+flags = -W -Wall -pedantic
 dflags = -g -DDEBUG -DUSE_DEBUG
-inc = -I/usr/local/Cellar/boost/1.48.0/include/boost
+inc = -I/usr/include/boost -I/usr/include
 lib = -lboost_program_options-mt
 cmp = $(compiler) $(flags) $(inc) -c
 lnk = $(compiler) $(flags) $(lib) -o $(bin)
 objects = server.o eventbase.o network.o tpool.o
+
+ifeq ($(os), Darwin)
+    inc = -I/usr/local/Cellar/boost/1.48.0/include/boost
+    flags += -j8
+endif
 
 all : $(server) $(client)
 

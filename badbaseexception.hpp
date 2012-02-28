@@ -1,5 +1,6 @@
 #ifndef DM_BADBASEEXCEPTION_HPP
 #define DM_BADBASEEXCEPTION_HPP
+#include <exception>
 namespace dm {
 
 /**

@@ -1,6 +1,7 @@
 #include "network.hpp"
 #include <errno.h>
 #include <iostream>
+#include <stdlib.h>
 namespace dm
 {
 

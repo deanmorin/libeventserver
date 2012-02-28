@@ -1,6 +1,7 @@
-#include <event2/thread.h>
-#include <string>
 #include "eventbase.hpp"
+#include <event2/thread.h>
+#include <string.h>
+#include "badbaseexception.hpp"
 namespace dm {
 
 EventBase::EventBase(const char* method)
