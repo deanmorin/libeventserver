@@ -8,6 +8,10 @@ namespace dm
 
 /**
  * Keep reading from the socket until bufsize bytes are read.
+ *
+ * @param fd The socket to read from.
+ * @param buf The buffer to fill.
+ * @param bufsize The size of the buffer and the number of bytes to read.
  * @author Dean Morin
  */
 int clearSocket(int fd, char* buf, int bufsize);

@@ -78,8 +78,7 @@ typedef struct
 /**
  * Creates and initializes a thread pool.
  *
- * @author Igor Cheifot
- * @author Dean Morin
+ * @author Dean Morin (based on work by Igor Cheifot)
  * @param tpoolp A double pointer to a tpool struct that will be initialized.
  *      It should be a null pointer; memory for the struct will be allocated
  *      within the function.
@@ -96,8 +95,7 @@ int tPoolInit(tPool** tpoolp, int numWorkerThreads, int maxQueueSize,
 /**
  * Adds a job to the job queue to eventually be completed by a worker thread.
  *
- * @author Igor Cheifot
- * @author Dean Morin
+ * @author Dean Morin (based on work by Igor Cheifot)
  * @param tpool The thread pool that the job should be added to.
  * @param routine The function that the worker thread will run.
  * @param arg The argument that will be passed to the worker thread.
@@ -108,8 +106,7 @@ int tPoolAddJob(tPool* tpool, void (*routine)(void*), void* arg);
 /**
  * Destroys a thread pool.
  *
- * @author Igor Cheifot
- * @author Dean Morin
+ * @author Dean Morin (based on work by Igor Cheifot)
  * @param tpool The thread pool that needs to be shut down.
  * @param finishQueue Set to non-zero if the jobs currently in the queue should
  *      be finished before shutting down
@@ -124,8 +121,7 @@ int tPoolDestroy(tPool* tpool, int finishQueue);
  * process the job. This does not ever need to be called from outside of
  * tPoolInit()
  *
- * @author Igor Cheifot
- * @author Dean Morin
+ * @author Dean Morin (based on work by Igor Cheifot)
  * @param tpool The thread pool that the thread belongs to.
  */
 void* tPoolThreadDoJobs(void* tpool);

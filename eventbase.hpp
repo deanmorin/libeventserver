@@ -15,7 +15,7 @@ private:
 
 public:
     /**
-     * @arg method The event method to use.
+     * @param method The event method to use.
      * @throws BadBaseException method is not available on this system.
      * @throws exception pthreads are not available on this system. 
      * @author Dean Morin

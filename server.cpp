@@ -24,8 +24,14 @@ EventBase* initLibEvent(const char* method);
 evutil_socket_t listenSock(const int port);
 void runServer(EventBase* eb, const int port, const int numWorkerThreads, 
         const int maxQueueSize);
-void runThreadServer(const int port, const int threads, const int queue);
+void runServerTh(const int port, const int numWorkerThreads, 
+        const int maxQueueSize);
 
+struct readArgs
+{
+    struct bufferevent* bev;
+    tPool* pool;  
+};
 
 /**
  * A server intended to test the differences in efficiency between the various
@@ -97,7 +103,7 @@ int main(int argc, char** argv)
     }
     else if (vm.count("threads"))
     {
-        runThreadServer(port, threads, queue);
+        runServerTh(port, threads, queue);
     }
     else
     {
@@ -115,7 +121,7 @@ int main(int argc, char** argv)
 
 /**
  * Perform the initialization required to use the libevent library.
- * @arg method The desired event method to use.
+ * @param method The desired event method to use.
  * @return The initialized event base. This is heap allocated and so the caller
  * must call delete on it later.
  * @author Dean Morin
@@ -262,6 +268,103 @@ void runServer(EventBase* eb, const int port, const int numWorkerThreads,
     event_del(sigint);
 }
 
-void runThreadServer(const int port, const int threads, const int queue)
+/**
+ * Read message from fd, the return a packet of random characters.
+ * @param args The socket to read from / write to.
+ * @author Dean Morin
+ */
+void readSockTh(void* args)
 {
+    evutil_socket_t fd = *(evutil_socket_t*) args;
+    char readBuf[REQUEST_SIZE];
+    uint32_t msgSize;
+
+    clearSocket(fd, readBuf, REQUEST_SIZE);
+
+    msgSize = (readBuf[3] << 24) & 0xFF000000
+            + (readBuf[2] << 16) & 0x00FF0000
+            + (readBuf[1] <<  8) & 0x0000FF00
+            +  readBuf[1]        & 0x000000FF;
+#ifdef DEBUG
+    std::cerr << "msgsize: " << msgSize << "\n";
+#endif
+    char* writeBuf = new char[msgSize];
+
+    // fill the packet with random characters
+    for (size_t i = 0; i < msgSize; i++)
+    {
+        writeBuf[i] = rand() % 93 + 33;
+    }
+
+    send(fd, writeBuf, msgSize, 0);
+
+    delete writeBuf;
+}
+
+/**
+ * Set up a new socket so that the port it's bound to can be immediately reused 
+ * after exiting the program.
+ * @param fd The socket to perform these operations on.
+ * @author Dean Morin
+ */
+void setUpSocket(evutil_socket_t fd)
+{
+    int arg = 1;
+    // set so port can be resused imemediately after ctrl-c
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &arg, sizeof(arg)) == -1) 
+    {
+        perror("setsockopt()");
+        exit(1);
+    }
+}
+
+evutil_socket_t acceptClientTh(evutil_socket_t fd)
+{
+    evutil_socket_t fdNew;
+	struct sockaddr_in addr;
+	socklen_t addrSize = sizeof(struct sockaddr_in);
+
+    fdNew = accept(fd, (struct sockaddr*) &addr, &addrSize);
+    if (fdNew == -1) 
+    {
+        perror("accept");
+    }
+    setUpSocket(fdNew);
+
+    std::cerr << "got im himler\n";
+    return fdNew;
+}
+
+void runServerTh(const int port, const int numWorkerThreads,
+        const int maxQueueSize)
+{
+	struct sockaddr_in addr;
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+    addr.sin_port = htons(port);
+
+    tPool* pool = NULL;
+    int blockWhenQueueFull = 1;
+
+    if (tPoolInit(&pool, numWorkerThreads, maxQueueSize, blockWhenQueueFull))
+    {
+        std::cerr << "Error initializing thread pool\n";
+        exit(1);
+    }
+
+    while (true)
+    {
+        evutil_socket_t fd;
+        //listen
+        evutil_socket_t fdNew;
+        fdNew = acceptClientTh(fd);
+        
+        if (tPoolAddJob(pool, readSockTh, &fdNew))
+        {
+            std::cerr << "Error adding new job to thread pool\n";
+            exit(1);
+        }
+    }
 }
