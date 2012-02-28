@@ -23,6 +23,7 @@ int clearSocket(int fd, char* buf, int bufsize)
 #ifdef DEBUG
             perror("recv(): EAGAIN");
 #endif
+            break;
         } 
         else if (!read)
         {
