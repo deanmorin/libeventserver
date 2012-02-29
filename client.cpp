@@ -3,6 +3,7 @@
 #include <program_options.hpp>
 #include <pthread.h>
 #include <iostream>
+#include <math.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <sys/resource.h>
@@ -44,15 +45,13 @@ void* requestData(void* args)
 
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) == -1)
     {
-        perror("socket() could not create socket");
-        exit(1);
+        exit(sockError("socket()", 0));
     }
     int arg = 1;
     // set so port can be resused imemediately after ctrl-c
     if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &arg, sizeof(arg)) == -1) 
     {
-        perror("setsockopt()");
-        exit(1);
+        exit(sockError("setsockopt()", 0));
     }
 
     // set up address structure
@@ -63,23 +62,20 @@ void* requestData(void* args)
     {
         std::cerr << "Error: unknown server address\n";
         exit(1);
-        std::cerr << i << "\n";
     }
     memcpy(hp->h_addr, (char*) &server.sin_addr, hp->h_length);
     
     // connect
-    if (connect(sock, (struct sockaddr*) &server, sizeof(server)) == -1)
+    if (connect(sock, (struct sockaddr*) &server, sizeof(server)))
     {
-        perror("connect() could not connect to server");
-        exit(1);
+        exit(sockError("connect()", 0));
     }
 
 #ifdef __APPLE__
     int set = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, (void*) &set, sizeof(int)))
     {
-        perror("setsockopt() failed");
-        std::cerr << set << "\n";
+        exit(sockError("setsockopt()", 0));
     }
 #else
     flag = MSG_NOSIGNAL;
@@ -88,8 +84,7 @@ void* requestData(void* args)
     struct timeval startTime;
     if (gettimeofday(&startTime, NULL) == -1)
     {
-        perror("gettimeofday()");
-        exit(1);
+        exit(sockError("gettimeofday()", 0));
     }
 
     // transmit request and receive packets
@@ -107,8 +102,7 @@ void* requestData(void* args)
     struct timeval endTime;
     if (gettimeofday(&endTime, NULL) == -1)
     {
-        perror("gettimeofday()");
-        exit(1);
+        exit(sockError("gettimeofday()", 0));
     }
 
     double* timeToComplete = new double();
