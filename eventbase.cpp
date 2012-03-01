@@ -4,6 +4,7 @@
 #include "badbaseexception.hpp"
 namespace dm {
 
+
 EventBase::EventBase(const char* method)
 {
     // enable locking for libevent structure
