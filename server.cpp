@@ -23,20 +23,41 @@ using namespace dm;
 #define DFLT_PORT       32000
 #define LISTEN_BACKLOG  65535
 
+struct readArgs
+{
+    struct bufferevent* bev;
+    tPool* pool;  
+};
+
+
+/**
+ * Perform the initialization required to use the libevent library.
+ *
+ * @author Dean Morin
+ * @param method The desired event method to use.
+ * @return The initialized event base. This is heap allocated and so the caller
+ *      must call delete on it later.
+ */
 EventBase* initLibEvent(const char* method);
 evutil_socket_t listenSock(const int port);
 void runServer(EventBase* eb, const int port, const int numWorkerThreads, 
         const int maxQueueSize);
 void runServerTh(const int port, const int numWorkerThreads, 
         const int maxQueueSize);
-void incrementClients();
-void decrementClients();
 
-struct readArgs
-{
-    struct bufferevent* bev;
-    tPool* pool;  
-};
+/**
+ * Increment the count of connected clients. Thread safe.
+ * 
+ * @author Dean Morin
+ */
+void incrementClients();
+
+/**
+ * Decrement the count of connected clients. Thread safe.
+ * 
+ * @author Dean Morin
+ */
+void decrementClients();
 
 pthread_mutex_t clientCountMutex;
 int clientCount;
@@ -45,6 +66,7 @@ int maxClientCount;
 /**
  * A server intended to test the differences in efficiency between the various
  * event handling methods.
+ *
  * @author Dean Morin
  */
 int main(int argc, char** argv)
@@ -119,6 +141,7 @@ int main(int argc, char** argv)
     }
     else if (vm.count("threads"))
     {
+        // run server with threads
         runServerTh(port, threads, queue);
     }
     else
@@ -129,19 +152,14 @@ int main(int argc, char** argv)
 
     if (method.compare(""))
     {
+        // run server with libevent and the specified event base
         eb = initLibEvent(method.c_str());
         runServer(eb, port, threads, queue);
     }
     return 0;
 }
 
-/**
- * Perform the initialization required to use the libevent library.
- * @param method The desired event method to use.
- * @return The initialized event base. This is heap allocated and so the caller
- * must call delete on it later.
- * @author Dean Morin
- */
+
 EventBase* initLibEvent(const char* method)
 {
     try
@@ -171,6 +189,13 @@ EventBase* initLibEvent(const char* method)
     }
 }
 
+
+/**
+ * Display the maximum number of clients that were connected at one time, then
+ * shut down the server. Initiated by ctrl-c.
+ *
+ * @author Dean Morin
+ */
 void shutDown(int)
 {
     std::cout << "\nHighest number of simultaneous connections: " 
@@ -178,6 +203,13 @@ void shutDown(int)
 	exit(0);
 }
 
+/**
+ * When ctrl-c is pressed and libevent is being used, this function frees the
+ * listen socket, then calls shutDown().
+ *
+ * @param arg The 
+ * @author Dean Morin
+ */
 void handleSigint(evutil_socket_t, short, void* arg)
 {
     evconnlistener_free((struct evconnlistener*) arg);
@@ -275,8 +307,7 @@ void runServer(EventBase* eb, const int port, const int numWorkerThreads,
             LEV_OPT_CLOSE_ON_FREE | LEV_OPT_REUSEABLE, LISTEN_BACKLOG, 
             (struct sockaddr*) &addr, sizeof(addr))))
     {
-        perror("evconnlistener_new_bind()");
-        exit(1);
+        exit(sockError("evconnlistener_new_bind()", 0));
     }
     evconnlistener_set_error_cb(listener, acceptErr);
 
@@ -334,10 +365,10 @@ void setUpSocket(evutil_socket_t fd)
     // set so port can be resused imemediately after ctrl-c
     if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &arg, sizeof(arg)) == -1) 
     {
-        perror("setsockopt()");
-        exit(1);
+        exit(sockError("setsockopt()", 0));
     }
 }
+
 
 evutil_socket_t acceptClientTh(evutil_socket_t fd)
 {
@@ -345,10 +376,9 @@ evutil_socket_t acceptClientTh(evutil_socket_t fd)
 	struct sockaddr_in addr;
 	socklen_t addrSize = sizeof(struct sockaddr_in);
 
-    fdNew = accept(fd, (struct sockaddr*) &addr, &addrSize);
-    if (fdNew == -1) 
+    if ((fdNew = accept(fd, (struct sockaddr*) &addr, &addrSize)) == -1)
     {
-        perror("accept");
+        exit(sockError("accect()", 0));
     }
     setUpSocket(fdNew);
     
@@ -356,6 +386,7 @@ evutil_socket_t acceptClientTh(evutil_socket_t fd)
 
     return fdNew;
 }
+
 
 void runServerTh(const int port, const int numWorkerThreads,
         const int maxQueueSize)
@@ -383,32 +414,27 @@ void runServerTh(const int port, const int numWorkerThreads,
 
     if (sigemptyset(&sigint.sa_mask) == -1)
     {
-        perror ("sigemptyset(); sigaction();");
-        exit(1);
+        exit(sockError("sigemptyset()", 0));
     }
     if (sigaction(SIGINT, &sigint, NULL) == -1)
     {
-        perror ("sigemptyset(); sigaction();");
-        exit(1);
+        exit(sockError("sigaction()", 0));
     }
 
     if ((fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
 	{
-		perror("socket()");
-		exit(1);
+        exit(sockError("socket()", 0));
 	}
 
     setUpSocket(fd);
 
 	if (bind(fd, (struct sockaddr*) &addr, sizeof(addr)) == -1)
 	{
-		perror("bind()");
-		exit(1);
+        exit(sockError("bind()", 0));
 	}
     if (listen(fd, LISTEN_BACKLOG))
     {
-        perror("listen()");
-        exit(1);
+        exit(sockError("listen()", 0));
     }
 
     while (true)
@@ -424,6 +450,7 @@ void runServerTh(const int port, const int numWorkerThreads,
     }
 }
 
+
 void incrementClients() 
 {
     pthread_mutex_lock(&clientCountMutex);
@@ -436,6 +463,7 @@ void incrementClients()
 #endif
     pthread_mutex_unlock(&clientCountMutex);
 }
+
 
 void decrementClients() 
 {

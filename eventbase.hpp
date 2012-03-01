@@ -14,27 +14,27 @@ private:
 
 public:
     /**
+     * @author Dean Morin
      * @param method The event method to use.
      * @throws BadBaseException method is not available on this system.
      * @throws exception pthreads are not available on this system. 
-     * @author Dean Morin
      */
     EventBase(const char* method);
     ~EventBase();
 
     /**
-     * @return The name of the event handling method being used.
      * @author Dean Morin
+     * @return The name of the event handling method being used.
      */
     const char* getMethod();
     /**
-     * @return The event base structure.
      * @author Dean Morin
+     * @return The event base structure.
      */
     struct event_base* getBase();
     /**
-     * @return All available event handling methods for this system.
      * @author Dean Morin
+     * @return All available event handling methods for this system.
      */
     static const char** getAvailableMethods();
 };

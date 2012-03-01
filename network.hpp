@@ -14,6 +14,7 @@ namespace dm
  * @param fd The socket to read from.
  * @param buf The buffer to fill.
  * @param bufsize The size of the buffer and the number of bytes to read.
+ * @return The number of bytes read, or -1 if the socket has closed.
  */
 int clearSocket(int fd, char* buf, int bufsize);
 
