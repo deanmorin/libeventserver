@@ -7,7 +7,7 @@
 #include <event2/thread.h>
 #include <fcntl.h>
 #include <iostream>
-#include <program_options.hpp>
+#include <boost/program_options.hpp>
 #include <signal.h>
 #include <stdio.h>
 #include <string>
@@ -38,7 +38,7 @@ struct readArgs
  * @return The initialized event base. This is heap allocated and so the caller
  *      must call delete on it later.
  */
-EventBase* initLibEvent(const char* method);
+EventBase* initlibEvent(const char* method);
 evutil_socket_t listenSock(const int port);
 void runServer(EventBase* eb, const int port, const int numWorkerThreads, 
         const int maxQueueSize);
@@ -153,14 +153,14 @@ int main(int argc, char** argv)
     if (method.compare(""))
     {
         // run server with libevent and the specified event base
-        eb = initLibEvent(method.c_str());
+        eb = initlibEvent(method.c_str());
         runServer(eb, port, threads, queue);
     }
     return 0;
 }
 
 
-EventBase* initLibEvent(const char* method)
+EventBase* initlibEvent(const char* method)
 {
     try
     {
@@ -207,7 +207,7 @@ void shutDown(int)
  * When ctrl-c is pressed and libevent is being used, this function frees the
  * listen socket, then calls shutDown().
  *
- * @param arg The 
+ * @param arg The struct responsible for the listening socket.
  * @author Dean Morin
  */
 void handleSigint(evutil_socket_t, short, void* arg)

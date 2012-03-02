@@ -5,6 +5,7 @@
 namespace dm
 {
 
+/** The total size of the request packets sent to the server. */
 #define REQUEST_SIZE    66
 
 /**
