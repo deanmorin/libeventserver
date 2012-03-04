@@ -1,9 +1,8 @@
 #!/bin/bash
 
-which yum &> /dev/null 
-yumresult=$?
+cat /etc/issue | grep -i fedora &> /dev/null
 
-if [ $yumresult -ne 0 ]; then
+if [ "$?" -ne 0 ]; then
     echo "This script is meant for Fedora"
     exit 1
 fi
@@ -34,6 +33,6 @@ ulimit -s
 echo ">>> Reducing stack size:"
 ulimit -s $stack_size
 echo ">>> Increasing max socket backlog:"
-sysctl -w net.core.somaxconn=8096
+sysctl -w net.core.somaxconn=8192
 echo ">>> Increasing max number of open files:"
 ulimit -n 20000

@@ -13,7 +13,6 @@
 #include <string>
 #include <vector>
 #include "network.hpp"
-
 namespace po = boost::program_options;
 using namespace dm;
 
@@ -55,7 +54,7 @@ void* requestData(void* args)
     }
 
     // set up address structure
-    bzero((char*) &server, sizeof(struct sockaddr_in));
+    memset((char*) &server, 0, sizeof(struct sockaddr_in));
     server.sin_family = AF_INET;
     server.sin_port = htons(ca->port);
     if (!(hp = gethostbyname(ca->host.c_str())))
@@ -63,7 +62,7 @@ void* requestData(void* args)
         std::cerr << "Error: unknown server address\n";
         exit(1);
     }
-    memcpy(hp->h_addr, (char*) &server.sin_addr, hp->h_length);
+    memcpy((char*) &server.sin_addr, hp->h_addr, hp->h_length);
     
     // connect
     if (connect(sock, (struct sockaddr*) &server, sizeof(server)))
@@ -144,6 +143,7 @@ void runClients(struct clientArgs* args, int clients)
             perror("pthread_create()");
             exit(1);
         }
+        usleep(1000);
     }
     for (i = 0; i < clients; i++)
     {
