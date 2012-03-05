@@ -22,7 +22,7 @@ echo ">>> Installing libevent dependencies"
 yum install libevent-devel
 
 echo
-read -n 1 -p ">>> Is this a client machine? [y/n] "
+read -n 1 -p ">>> Will this shell be running a client? [y/n] "
 echo
 if [ "$REPLY" == "Y" ] || [ "$REPLY" == "y" ]; then
     stack_size=512
