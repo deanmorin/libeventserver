@@ -185,12 +185,12 @@ void runClients(struct clientArgs* ca, int clients)
     double* timeToComplete = 0;
     double totalTime = 0;
     double averageTime = 0;
-    std::pair<struct clientArgs*, int>* args 
-            = new std::pair<struct clientArgs*, int>();
-    args->first = ca;
     
     for (i = 0; i < clients; i++)
     {
+        std::pair<struct clientArgs*, int>* args 
+                = new std::pair<struct clientArgs*, int>();
+        args->first = ca;
         args->second = i;
 
         if ((rtn = pthread_create(&threads[i], NULL, &requestData, 
