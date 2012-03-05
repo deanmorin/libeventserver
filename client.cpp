@@ -1,8 +1,9 @@
 #include <arpa/inet.h>
-#include <errno.h>
 #include <boost/program_options.hpp>
-#include <pthread.h>
+#include <errno.h>
 #include <iostream>
+#include <fstream>
+#include <pthread.h>
 #include <math.h>
 #include <netdb.h>
 #include <stdio.h>
@@ -16,6 +17,9 @@
 namespace po = boost::program_options;
 using namespace dm;
 
+#define OUT_FILE        "response_times.csv"
+#define FILE_BUFSIZE    25
+
 double secondsDiff(const timeval& val1, const timeval& val2);
 
 struct clientArgs {
@@ -23,6 +27,11 @@ struct clientArgs {
     int port;
     uint32_t size;
     int count;
+    int threadID;
+#ifdef STATS
+    std::ofstream* out;
+    pthread_mutex_t fileMutex;
+#endif
 };
 
 void* requestData(void* args)
@@ -63,7 +72,7 @@ void* requestData(void* args)
         exit(1);
     }
     memcpy((char*) &server.sin_addr, hp->h_addr, hp->h_length);
-    
+
     // connect
     if (connect(sock, (struct sockaddr*) &server, sizeof(server)))
     {
@@ -86,15 +95,41 @@ void* requestData(void* args)
         exit(sockError("gettimeofday()", 0));
     }
 
+#ifdef STATS
+    struct timeval sendTime;
+    struct timeval recvTime;
+    double roundTrips[FILE_BUFSIZE];
+#endif
+
     // transmit request and receive packets
     for (i = 0; i < ca->count; i++)
     {
+#ifdef STATS
+        if (gettimeofday(&sendTime, NULL) == -1)
+        {
+            exit(sockError("gettimeofday()", 0));
+        }
+#endif
         if (send(sock, requestMsg, REQUEST_SIZE, flag) < 0)
         {
             perror("send() failed");
             exit(1);
         }
         clearSocket(sock, responseMsg, bytesToRead);
+
+#ifdef STATS
+        if (gettimeofday(&recvTime, NULL) == -1)
+        {
+            exit(sockError("gettimeofday()", 0));
+        }
+
+        roundTrips[i % FILE_BUFSIZE] = secondsDiff(sendTime, recvTime);
+        if (i % FILE_BUFSIZE == FILE_BUFSIZE - 1)
+        {
+            //out << ca->threadID << "," << ",
+        }
+#endif
+
     }
     close(sock);
 
@@ -133,6 +168,8 @@ void runClients(struct clientArgs* args, int clients)
     
     for (i = 0; i < clients; i++)
     {
+        args->threadID = i;
+
         if ((rtn = pthread_create(&threads[i], NULL, &requestData, 
                         (void*) args)))
         {
@@ -208,6 +245,16 @@ int main(int argc, char** argv)
     std::cout << "Message size:\t\t" << args->size << "\n";
     std::cout << "Message count:\t\t" << args->count << "\n";
     std::cout << "Number of clients:\t" << clients << "\n";
+
+#ifdef STATS
+    std::ofstream out(OUT_FILE);
+    if (!out)
+    {
+        std::cerr << "unable to open \"" << OUT_FILE << "\"\n";
+        exit(1);
+    }
+    out << "Thread ID,Seconds,Message Size";
+#endif
 
     runClients(args, clients);
     delete args;
