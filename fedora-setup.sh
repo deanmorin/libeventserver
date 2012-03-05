@@ -25,14 +25,18 @@ echo
 if [ "$REPLY" != "Y" ] && [ "$REPLY" != "y" ]; then
     stack_size=512
 else
-    stack_size=1024
+    stack_size=8192
 fi
 
-echo ">>> Current stack size:"
-ulimit -s
-echo ">>> Reducing stack size:"
+old=$(ulimit -s)
 ulimit -s $stack_size
-echo ">>> Increasing max socket backlog:"
-sysctl -w net.core.somaxconn=8192
-echo ">>> Increasing max number of open files:"
-ulimit -n 20000
+echo "stack size: $old -> $(ulimit -s)"
+
+old=$(ulimit -n)
+ulimit -n 65536
+echo "open files: $old -> $(ulimit -n)"
+
+old=$(sysctl net.core.somaxconn | tr -cd [:digit:])
+sysctl -w net.core.somaxconn=8192 &> /dev/null
+new=$(sysctl net.core.somaxconn | tr -cd [:digit:])
+echo "max socket backlog: $old -> $new"
