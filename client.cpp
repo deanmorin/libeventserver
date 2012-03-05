@@ -137,7 +137,8 @@ void* requestData(void* args)
             roundTrips[msgInBuf % FILE_BUFSIZE] 
                     = secondsDiff(sendTime, recvTime);
 
-            if (msgInBuf % FILE_BUFSIZE == FILE_BUFSIZE - 1)
+            if (msgInBuf % FILE_BUFSIZE == FILE_BUFSIZE - 1 
+                || i == ca->count - 1)
             {
                 pthread_mutex_lock(&ca->fileMutex);
                 for (size_t j = 0; j < FILE_BUFSIZE; j++)
