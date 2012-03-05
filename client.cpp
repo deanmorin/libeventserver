@@ -127,7 +127,7 @@ void* requestData(void* args)
         clearSocket(sock, responseMsg, bytesToRead);
 
 #ifdef STATS
-        if (i % MSG_PER_RECORD == MSG_PER_RECORD - 1)
+        if (i % MSG_PER_RECORD == MSG_PER_RECORD - 1 || i == ca->count - 1)
         {
             if (gettimeofday(&recvTime, NULL) == -1)
             {
@@ -144,7 +144,7 @@ void* requestData(void* args)
                 for (size_t j = 0; j < FILE_BUFSIZE; j++)
                 {
                     ca->out << threadID << "," << i << "," << ca->size << "," 
-                            << roundTrips[j];
+                            << roundTrips[j] << "\n";
                 }
                 pthread_mutex_unlock(&ca->fileMutex);
             }
@@ -277,7 +277,7 @@ int main(int argc, char** argv)
         std::cerr << "unable to open \"" << OUT_FILE << "\"\n";
         exit(1);
     }
-    args.out << "Thread ID,Message Count,Message Size,Seconds";
+    args.out << "Thread ID,Message Count,Message Size,Seconds\n";
 
     if (pthread_mutex_init(&args.fileMutex, NULL))
     {
