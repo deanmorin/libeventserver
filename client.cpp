@@ -287,6 +287,9 @@ int main(int argc, char** argv)
 
     runClients(&args, clients);
 
+#ifdef STATS
+    args.out.close();
+#endif
     return 0;
 }
 
