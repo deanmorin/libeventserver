@@ -22,7 +22,7 @@ yum install libevent-devel
 
 read -n 1 -p ">>> Is this a client machine? [y/n] "
 echo
-if [ "$REPLY" != "Y" ] && [ "$REPLY" != "y" ]; then
+if [ "$REPLY" == "Y" ] || [ "$REPLY" == "y" ]; then
     stack_size=512
 else
     stack_size=8192
