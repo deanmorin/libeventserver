@@ -18,8 +18,8 @@ namespace po = boost::program_options;
 using namespace dm;
 
 #define OUT_FILE        "response_times.csv"
-#define FILE_BUFSIZE    5
-#define MSG_PER_RECORD  10
+#define FILE_BUFSIZE    4
+#define MSG_PER_RECORD  25
 
 double secondsDiff(const timeval& val1, const timeval& val2);
 
@@ -104,6 +104,7 @@ void* requestData(void* args)
     struct timeval sendTime;
     struct timeval recvTime;
     double roundTrips[FILE_BUFSIZE];
+    size_t firstMsgNo = 0;
     size_t msgInBuf = 0;
 #endif
 
@@ -117,6 +118,7 @@ void* requestData(void* args)
             {
                 exit(sockError("gettimeofday()", 0));
             }
+            firstMsgNo = i + 1;
         }
 #endif
         if (send(sock, requestMsg, REQUEST_SIZE, flag) < 0)
@@ -141,12 +143,13 @@ void* requestData(void* args)
                 || i == ca->count - 1)
             {
                 pthread_mutex_lock(&ca->fileMutex);
-                for (size_t j = 0; j < FILE_BUFSIZE; j++)
+                for (size_t j = 0; j < msgInBuf; j++)
                 {
-                    ca->out << threadID << "," << i << "," << ca->size << "," 
-                            << roundTrips[j] << "\n";
+                    ca->out << threadID << "," << firstMsgNo << "-" << i + 1
+                            << "," << ca->size << "," << roundTrips[j] << "\n";
                 }
                 pthread_mutex_unlock(&ca->fileMutex);
+                msgInBuf--;
             }
         }
 #endif
@@ -230,9 +233,9 @@ int main(int argc, char** argv)
          "port to use")
         ("message-size,s", po::value<int>(&opt)->default_value(1024), 
          "length of packets to request")
-        ("message-count,c", po::value<int>(&opt)->default_value(25), 
+        ("message-count,c", po::value<int>(&opt)->default_value(250),
          "number of packets to request")
-        ("clients,x", po::value<int>(&opt)->default_value(250), 
+        ("clients,x", po::value<int>(&opt)->default_value(250),
          "number of clients to create")
         ("help", "show this message")
     ;
