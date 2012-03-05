@@ -18,7 +18,7 @@ namespace po = boost::program_options;
 using namespace dm;
 
 #define OUT_FILE        "response_times.csv"
-#define FILE_BUFSIZE    4
+#define FILE_BUFSIZE    10
 #define MSG_PER_RECORD  25
 
 double secondsDiff(const timeval& val1, const timeval& val2);
@@ -105,6 +105,7 @@ void* requestData(void* args)
     struct timeval recvTime;
     double roundTrips[FILE_BUFSIZE];
     size_t firstMsgNo = 1;
+	size_t lastMsgNo[FILE_BUFSIZE];
     size_t msgInBuf = 0;
 #endif
 
@@ -134,23 +135,24 @@ void* requestData(void* args)
             {
                 exit(sockError("gettimeofday()", 0));
             }
-            msgInBuf++;
             roundTrips[msgInBuf % FILE_BUFSIZE] 
                     = secondsDiff(sendTime, recvTime);
-            std::cerr << "roundtrips index: " << msgInBuf % FILE_BUFSIZE << "\n";
+			lastMsgNo[msgInBuf % FILE_BUFSIZE] = i + 1;
+            msgInBuf++;
 
-            if (msgInBuf % FILE_BUFSIZE == FILE_BUFSIZE - 1 
+            if (msgInBuf % FILE_BUFSIZE == 0
                 || i == ca->count - 1)
             {
                 pthread_mutex_lock(&ca->fileMutex);
                 for (size_t j = 0; j < msgInBuf; j++)
                 {
-                    ca->out << threadID << "," << firstMsgNo << "-" << i + 1
-                            << "," << ca->size << "," << roundTrips[j] << "\n";
+                    ca->out << threadID << "," << firstMsgNo << " to "
+							<< lastMsgNo[j] << "," << ca->size << ","
+							<< roundTrips[j] << "\n";
+					firstMsgNo = lastMsgNo[j] + 1;
                 }
                 pthread_mutex_unlock(&ca->fileMutex);
-                msgInBuf--;
-                firstMsgNo = i + 2;
+                msgInBuf = 0;
             }
         }
 #endif
