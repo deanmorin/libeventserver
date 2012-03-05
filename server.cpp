@@ -215,14 +215,13 @@ void shutDown(int)
     std::cout << "Clients still connected: \n\n";
 
     std::map<evutil_socket_t, struct client>::iterator it;
-    struct client* c;
     for (it = clients.begin(); it != clients.end(); ++it)
     {
-        *c = (struct client) it->second;
-        std::cout << "\tHost name:\t\t" << c->hostName << "\n"
-                  << "\tPort:\t\t\t" << c->port << "\n"
-                  << "\tRequests received:\t" << c->requestsRecv << "\n"
-                  << "\tData sent:\t\t" << c->dataSent << "\n\n";
+        struct client c = it->second;
+        std::cout << "\tHost name:\t\t" << c.hostName << "\n"
+                  << "\tPort:\t\t\t" << c.port << "\n"
+                  << "\tRequests received:\t" << c.requestsRecv << "\n"
+                  << "\tData sent:\t\t" << c.dataSent << "\n\n";
     }
 
     pthread_mutex_unlock(&clientMutex);
