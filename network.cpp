@@ -17,10 +17,11 @@ int clearSocket(int fd, char* buf, int bufsize)
         {
             if (errno != EAGAIN)
             {
-                return -1;
+                sockError("recv()", 0);
+                return -1
             }
 #ifdef DEBUG
-            perror("recv(): EAGAIN");
+            sockError("recv()", 0);
 #endif
             break;
         } 
@@ -50,6 +51,7 @@ int sockError(const char* msg, int err)
 
     switch (err)
     {
+        case EAGAIN:        fprintf(stderr, "EAGAIN\n");        break;
         case EACCES:        fprintf(stderr, "EACCES\n");        break;
         case EADDRINUSE:    fprintf(stderr, "EADDRINUSE\n");    break;
         case EADDRNOTAVAIL: fprintf(stderr, "EADDRNOTAVAIL\n"); break;

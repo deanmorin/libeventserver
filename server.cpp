@@ -250,6 +250,7 @@ static void sockEvent(struct bufferevent* bev, short events, void*)
     }
     if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) 
     {
+        std::cerr << "Is it doing this first?\n";
         bufferevent_free(bev);
         decrementClients(bufferevent_getfd(bev));
     }
@@ -263,8 +264,14 @@ void handleRequest(void* args)
 
     //client may have disconnected
     int rtn = recv(fd, &peek, 1, MSG_PEEK);
-    if (rtn == -1 || rtn == 0)
+    if (rtn == -1)
     {
+        sockErr("peek", 0);
+        return;
+    }
+    if (rtn == 0)
+    {
+        std::cerr << "socket is closed?\n";
         return;
     }
     struct evbuffer *input = bufferevent_get_input(bev);
