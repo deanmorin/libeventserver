@@ -106,6 +106,11 @@ void* requestData(void* args)
 	size_t lastMsgNo[FILE_BUFSIZE];
     size_t msgInBuf = 0;
     double requestTime = 0;
+    int offset = 1;
+    if (MSG_PER_RECORD == 1)
+    {
+        offset = 0;
+    }
 
     // transmit request and receive packets
     for (i = 0; i < ca->count; i++)
@@ -124,7 +129,7 @@ void* requestData(void* args)
         }
         clearSocket(sock, responseMsg, bytesToRead);
 
-        if (i % MSG_PER_RECORD == MSG_PER_RECORD - 1 || i == ca->count - 1)
+        if (i % MSG_PER_RECORD == MSG_PER_RECORD - offset || i == ca->count - 1)
         {
             if (gettimeofday(&recvTime, NULL) == -1)
             {
