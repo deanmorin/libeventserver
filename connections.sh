@@ -7,7 +7,7 @@ while [ 1 ]; do
     if [ $count -eq 0 ]; then
         echo "Server is not running." 
         # wait for server to come up
-        while [ ! $(netstat -aon | grep 32000 | wc -l) ]; do
+        while [ $(netstat -aon | grep 32000 | wc -l) -eq "0" ]; do
             sleep 1
         done
     else
