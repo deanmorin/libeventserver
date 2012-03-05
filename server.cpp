@@ -390,8 +390,8 @@ void readSockTh(void* args)
 
         delete writeBuf;
     }
-    close(*fd);
     decrementClients(*fd);
+    close(*fd);
     delete fd;
 }
 
