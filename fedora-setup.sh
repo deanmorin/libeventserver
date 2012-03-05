@@ -27,7 +27,7 @@ echo
 if [ "$REPLY" == "Y" ] || [ "$REPLY" == "y" ]; then
     stack_size=512
 else
-    stack_size=8192
+    stack_size=65536
 fi
 
 old=$(ulimit -s)

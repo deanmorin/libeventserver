@@ -1,4 +1,5 @@
 #include <arpa/inet.h>
+#include <boost/program_options.hpp>
 #include <errno.h>
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
@@ -6,8 +7,9 @@
 #include <event2/listener.h>
 #include <event2/thread.h>
 #include <fcntl.h>
+#include <fstream>
 #include <iostream>
-#include <boost/program_options.hpp>
+#include <map>
 #include <signal.h>
 #include <stdio.h>
 #include <string>
@@ -23,10 +25,12 @@ using namespace dm;
 #define DFLT_PORT       32000
 #define LISTEN_BACKLOG  65535
 
-struct readArgs
+struct client
 {
-    struct bufferevent* bev;
-    tPool* pool;  
+    std::string hostName;
+    int port;
+    int requestsRecv;
+    unsigned long dataSent;
 };
 
 
@@ -62,6 +66,8 @@ void decrementClients();
 pthread_mutex_t clientCountMutex;
 int clientCount;
 int maxClientCount;
+std::map<evutil_socket_t, struct client> clients;
+pthread_mutex_t mapMutex;
 
 /**
  * A server intended to test the differences in efficiency between the various
@@ -112,6 +118,11 @@ int main(int argc, char** argv)
     queue = vm["max-queue"].as<int>();
     
     if (pthread_mutex_init(&clientCountMutex, NULL))
+    {
+        std::cerr << "Error creating mutex\n";
+        exit(1);
+    }
+    if (pthread_mutex_init(&mapMutex, NULL))
     {
         std::cerr << "Error creating mutex\n";
         exit(1);
@@ -226,6 +237,8 @@ static void sockEvent(struct bufferevent* bev, short events, void*)
     if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) 
     {
         bufferevent_free(bev);
+        evutil_socket_t fd = bufferevent_getfd(bev);
+        clients.erase(fd);
         decrementClients();
     }
 }
@@ -236,6 +249,7 @@ void handleRequest(void* args)
     struct evbuffer *input = bufferevent_get_input(bev);
     struct evbuffer *output = bufferevent_get_output(bev);
     uint32_t msgSize;
+
     if (evbuffer_copyout(input, &msgSize, sizeof(uint32_t)) == -1)
     {
         std::cerr << "Error: evbuffer_copyout\n";
@@ -250,6 +264,13 @@ void handleRequest(void* args)
     }
 
     evbuffer_add(output, buf, msgSize);
+
+    pthread_mutex_lock(&mapMutex);
+    evutil_socket_t fd = bufferevent_getfd(bev);
+    clients[fd].requestsRecv++;
+    clients[fd].dataSent += msgSize;
+    pthread_mutex_unlock(&mapMutex);
+
     delete[] buf;
 }
 
@@ -272,9 +293,15 @@ static void acceptErr(struct evconnlistener* listener, void*)
 }
 
 static void acceptClient(struct evconnlistener* listener, evutil_socket_t fd,
-        struct sockaddr*, int, void* arg)
+        struct sockaddr* sa, int, void* arg)
 {
     incrementClients();
+    struct sockaddr_in* addr = (sockaddr_in*) sa;
+
+    pthread_mutex_lock(&mapMutex);
+    clients[fd].hostName = inet_ntoa(addr->sin_addr);
+    clients[fd].port = addr->sin_port;
+    pthread_mutex_unlock(&mapMutex);
 
     struct event_base* base = evconnlistener_get_base(listener);
     struct bufferevent* bev = bufferevent_socket_new(base, fd, 
