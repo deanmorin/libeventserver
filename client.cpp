@@ -233,6 +233,7 @@ void runClients(struct clientArgs* ca, int clients)
 int main(int argc, char** argv)
 {
     int opt = 0;
+    double dopt = 0;
     std::string option = "";
     int clients = 0;
 
@@ -248,7 +249,7 @@ int main(int argc, char** argv)
          "number of packets to request")
         ("clients,x", po::value<int>(&opt)->default_value(250),
          "number of clients to create")
-        ("timeout,t", po::value<double>(&opt)->default_value(3),
+        ("timeout,t", po::value<double>(&dopt)->default_value(3),
          "seconds in timeout")
         ("help", "show this message")
     ;
