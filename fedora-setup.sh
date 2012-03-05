@@ -35,11 +35,11 @@ ulimit -s $stack_size
 echo "stack size: $old -> $(ulimit -s)"
 
 old=$(ulimit -n)
-ulimit -n 65536
+ulimit -n 1048576
 echo "open files: $old -> $(ulimit -n)"
 
 old=$(sysctl net.core.somaxconn | tr -cd [:digit:])
-sysctl -w net.core.somaxconn=8192 &> /dev/null
+sysctl -w net.core.somaxconn=1048576 &> /dev/null
 new=$(sysctl net.core.somaxconn | tr -cd [:digit:])
 echo "max socket backlog: $old -> $new"
 
