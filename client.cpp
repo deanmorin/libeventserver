@@ -104,7 +104,7 @@ void* requestData(void* args)
     struct timeval sendTime;
     struct timeval recvTime;
     double roundTrips[FILE_BUFSIZE];
-    size_t firstMsgNo = 0;
+    size_t firstMsgNo = 1;
     size_t msgInBuf = 0;
 #endif
 
@@ -118,7 +118,6 @@ void* requestData(void* args)
             {
                 exit(sockError("gettimeofday()", 0));
             }
-            firstMsgNo = i + 1;
         }
 #endif
         if (send(sock, requestMsg, REQUEST_SIZE, flag) < 0)
@@ -138,6 +137,7 @@ void* requestData(void* args)
             msgInBuf++;
             roundTrips[msgInBuf % FILE_BUFSIZE] 
                     = secondsDiff(sendTime, recvTime);
+            std::cerr << "roundtrips index: " << msgInBuf % FILE_BUFSIZE << "\n";
 
             if (msgInBuf % FILE_BUFSIZE == FILE_BUFSIZE - 1 
                 || i == ca->count - 1)
@@ -150,6 +150,7 @@ void* requestData(void* args)
                 }
                 pthread_mutex_unlock(&ca->fileMutex);
                 msgInBuf--;
+                firstMsgNo = i + 2;
             }
         }
 #endif
