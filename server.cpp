@@ -48,26 +48,28 @@ void runServer(EventBase* eb, const int port, const int numWorkerThreads,
         const int maxQueueSize);
 void runServerTh(const int port, const int numWorkerThreads, 
         const int maxQueueSize);
+void updateClientStats(evutil_socket_t fd, int data);
 
 /**
  * Increment the count of connected clients. Thread safe.
  * 
  * @author Dean Morin
+ * @param sa The address info on the new connection.
  */
-void incrementClients();
+void incrementClients(evutil_socket_t fd, struct sockaddr_in* sa);
 
 /**
  * Decrement the count of connected clients. Thread safe.
  * 
  * @author Dean Morin
+ * @param fd The socket that is being closed.
  */
-void decrementClients();
+void decrementClients(evutil_socket_t fd);
 
-pthread_mutex_t clientCountMutex;
+pthread_mutex_t clientMutex;
 int clientCount;
 int maxClientCount;
 std::map<evutil_socket_t, struct client> clients;
-pthread_mutex_t mapMutex;
 
 /**
  * A server intended to test the differences in efficiency between the various
@@ -117,12 +119,7 @@ int main(int argc, char** argv)
     threads = vm["thread-pool"].as<int>();
     queue = vm["max-queue"].as<int>();
     
-    if (pthread_mutex_init(&clientCountMutex, NULL))
-    {
-        std::cerr << "Error creating mutex\n";
-        exit(1);
-    }
-    if (pthread_mutex_init(&mapMutex, NULL))
+    if (pthread_mutex_init(&clientMutex, NULL))
     {
         std::cerr << "Error creating mutex\n";
         exit(1);
@@ -237,9 +234,7 @@ static void sockEvent(struct bufferevent* bev, short events, void*)
     if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) 
     {
         bufferevent_free(bev);
-        evutil_socket_t fd = bufferevent_getfd(bev);
-        clients.erase(fd);
-        decrementClients();
+        decrementClients(bufferevent_getfd(bev));
     }
 }
 
@@ -265,11 +260,7 @@ void handleRequest(void* args)
 
     evbuffer_add(output, buf, msgSize);
 
-    pthread_mutex_lock(&mapMutex);
-    evutil_socket_t fd = bufferevent_getfd(bev);
-    clients[fd].requestsRecv++;
-    clients[fd].dataSent += msgSize;
-    pthread_mutex_unlock(&mapMutex);
+    updateClientStats(bufferevent_getfd(bev), msgSize);
 
     delete[] buf;
 }
@@ -295,13 +286,7 @@ static void acceptErr(struct evconnlistener* listener, void*)
 static void acceptClient(struct evconnlistener* listener, evutil_socket_t fd,
         struct sockaddr* sa, int, void* arg)
 {
-    incrementClients();
-    struct sockaddr_in* addr = (sockaddr_in*) sa;
-
-    pthread_mutex_lock(&mapMutex);
-    clients[fd].hostName = inet_ntoa(addr->sin_addr);
-    clients[fd].port = addr->sin_port;
-    pthread_mutex_unlock(&mapMutex);
+    incrementClients(fd, (sockaddr_in*) sa);
 
     struct event_base* base = evconnlistener_get_base(listener);
     struct bufferevent* bev = bufferevent_socket_new(base, fd, 
@@ -377,7 +362,7 @@ void readSockTh(void* args)
 
         delete writeBuf;
     }
-    decrementClients();
+    decrementClients(*fd);
     delete fd;
 }
 
@@ -410,7 +395,7 @@ evutil_socket_t acceptClientTh(evutil_socket_t fd)
     }
     setUpSocket(fdNew);
     
-    incrementClients();
+    incrementClients(fd, &addr);
 
     return fdNew;
 }
@@ -479,9 +464,21 @@ void runServerTh(const int port, const int numWorkerThreads,
 }
 
 
-void incrementClients() 
+void updateClientStats(evutil_socket_t fd, int data)
 {
-    pthread_mutex_lock(&clientCountMutex);
+    pthread_mutex_lock(&clientMutex);
+
+    clients[fd].requestsRecv++;
+    clients[fd].dataSent += data;
+
+    pthread_mutex_unlock(&clientMutex);
+}
+
+
+void incrementClients(evutil_socket_t fd, struct sockaddr_in* sa)
+{
+    pthread_mutex_lock(&clientMutex);
+
     if (++clientCount > maxClientCount)
     {
         maxClientCount = clientCount;
@@ -489,16 +486,23 @@ void incrementClients()
 #ifdef DEBUG
     std::cout << "Clients++ " << clientCount << "\n";
 #endif
-    pthread_mutex_unlock(&clientCountMutex);
+    // add client to map
+    clients[fd].hostName = inet_ntoa(sa->sin_addr);
+    clients[fd].port = sa->sin_port;
+
+    pthread_mutex_unlock(&clientMutex);
 }
 
 
-void decrementClients() 
+void decrementClients(evutil_socket_t fd)
 {
-    pthread_mutex_lock(&clientCountMutex);
+    pthread_mutex_lock(&clientMutex);
+
     clientCount--;
 #ifdef DEBUG
     std::cout << "Clients-- " << clientCount << "\n";
 #endif
-    pthread_mutex_unlock(&clientCountMutex);
+    clients.erase(fd);
+
+    pthread_mutex_unlock(&clientMutex);
 }
