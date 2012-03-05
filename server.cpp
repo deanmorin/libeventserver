@@ -258,6 +258,16 @@ static void sockEvent(struct bufferevent* bev, short events, void*)
 void handleRequest(void* args)
 {
     struct bufferevent* bev = (struct bufferevent*) args;
+    char peek;
+    evutil_socket_t fd = bufferevent_getfd(bev);
+
+    //client may have disconnected
+    int rtn = recv(fd, &peek, 1, MSG_PEEK);
+    if (rtn == -1 || rtn == 0)
+    {
+        close(fd);
+        return;
+    }
     struct evbuffer *input = bufferevent_get_input(bev);
     struct evbuffer *output = bufferevent_get_output(bev);
     uint32_t msgSize;
@@ -277,7 +287,7 @@ void handleRequest(void* args)
 
     evbuffer_add(output, buf, msgSize);
 
-    updateClientStats(bufferevent_getfd(bev), msgSize);
+    updateClientStats(fd, msgSize);
 
     delete[] buf;
 }
@@ -381,6 +391,7 @@ void readSockTh(void* args)
 
         delete writeBuf;
     }
+    close(fd);
     decrementClients(*fd);
     delete fd;
 }
