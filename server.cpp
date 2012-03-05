@@ -209,6 +209,24 @@ void shutDown(int)
 {
     std::cout << "\nHighest number of simultaneous connections: " 
               << maxClientCount << "\n\n";
+
+    pthread_mutex_lock(&clientMutex);
+
+    std::cout << "Clients still connected: \n\n";
+
+    std::map<evutil_socket_t, struct client>::iterator it;
+    struct client* c;
+    for (it = clients.begin(); it != clients.end(); ++it)
+    {
+        *c = (struct client) it->second;
+        std::cout << "\tHost name:\t\t" << c->hostName << "\n"
+                  << "\tPort:\t\t\t" << c->port << "\n"
+                  << "\tRequests received:\t" << c->requestsRecv << "\n"
+                  << "\tData sent:\t\t" << c->dataSent << "\n\n";
+    }
+
+    pthread_mutex_unlock(&clientMutex);
+
 	exit(0);
 }
 
@@ -359,6 +377,8 @@ void readSockTh(void* args)
         }
 
         send(*fd, writeBuf, msgSize, 0);
+
+        updateClientStats(*fd, msgSize);
 
         delete writeBuf;
     }
