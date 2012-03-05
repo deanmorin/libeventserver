@@ -17,9 +17,11 @@ fi
 echo ">>> Installing boost dependencies"
 yum install boost-devel
 yum install boost-program-options
+echo
 echo ">>> Installing libevent dependencies"
 yum install libevent-devel
 
+echo
 read -n 1 -p ">>> Is this a client machine? [y/n] "
 echo
 if [ "$REPLY" == "Y" ] || [ "$REPLY" == "y" ]; then
@@ -41,7 +43,9 @@ sysctl -w net.core.somaxconn=8192 &> /dev/null
 new=$(sysctl net.core.somaxconn | tr -cd [:digit:])
 echo "max socket backlog: $old -> $new"
 
-echo "\n>>> Ensure that iptables are cleared\n"
+echo
+echo ">>> Ensure that iptables are cleared"
+echo
 iptables -X
 iptables -F
 iptables -L
