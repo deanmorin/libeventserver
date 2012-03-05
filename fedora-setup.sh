@@ -40,3 +40,8 @@ old=$(sysctl net.core.somaxconn | tr -cd [:digit:])
 sysctl -w net.core.somaxconn=8192 &> /dev/null
 new=$(sysctl net.core.somaxconn | tr -cd [:digit:])
 echo "max socket backlog: $old -> $new"
+
+echo "\n>>> Ensure that iptables are cleared\n"
+iptables -X
+iptables -F
+iptables -L
