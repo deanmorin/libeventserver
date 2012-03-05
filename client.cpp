@@ -18,7 +18,8 @@ namespace po = boost::program_options;
 using namespace dm;
 
 #define OUT_FILE        "response_times.csv"
-#define FILE_BUFSIZE    25
+#define FILE_BUFSIZE    5
+#define MSG_PER_RECORD  10
 
 double secondsDiff(const timeval& val1, const timeval& val2);
 
@@ -27,16 +28,20 @@ struct clientArgs {
     int port;
     uint32_t size;
     int count;
-    int threadID;
 #ifdef STATS
-    std::ofstream* out;
+    std::ofstream out;
     pthread_mutex_t fileMutex;
 #endif
 };
 
 void* requestData(void* args)
 {
-    struct clientArgs* ca = (clientArgs*) args;
+    std::pair<struct clientArgs*, int>* threadArgs 
+            = (std::pair<struct clientArgs*, int>*) args;
+    struct clientArgs* ca = threadArgs->first;
+    int threadID = threadArgs->second;
+    threadID += 1;
+    delete threadArgs;
     int i = 0;
     char requestMsg[REQUEST_SIZE];
     requestMsg[3] = (uint32_t) ((ca->size >> 24) & 0xFF);
@@ -99,15 +104,19 @@ void* requestData(void* args)
     struct timeval sendTime;
     struct timeval recvTime;
     double roundTrips[FILE_BUFSIZE];
+    size_t msgInBuf = 0;
 #endif
 
     // transmit request and receive packets
     for (i = 0; i < ca->count; i++)
     {
 #ifdef STATS
-        if (gettimeofday(&sendTime, NULL) == -1)
+        if (i % MSG_PER_RECORD == 0) 
         {
-            exit(sockError("gettimeofday()", 0));
+            if (gettimeofday(&sendTime, NULL) == -1)
+            {
+                exit(sockError("gettimeofday()", 0));
+            }
         }
 #endif
         if (send(sock, requestMsg, REQUEST_SIZE, flag) < 0)
@@ -118,15 +127,26 @@ void* requestData(void* args)
         clearSocket(sock, responseMsg, bytesToRead);
 
 #ifdef STATS
-        if (gettimeofday(&recvTime, NULL) == -1)
+        if (i % MSG_PER_RECORD == MSG_PER_RECORD - 1)
         {
-            exit(sockError("gettimeofday()", 0));
-        }
+            if (gettimeofday(&recvTime, NULL) == -1)
+            {
+                exit(sockError("gettimeofday()", 0));
+            }
+            msgInBuf++;
+            roundTrips[msgInBuf % FILE_BUFSIZE] 
+                    = secondsDiff(sendTime, recvTime);
 
-        roundTrips[i % FILE_BUFSIZE] = secondsDiff(sendTime, recvTime);
-        if (i % FILE_BUFSIZE == FILE_BUFSIZE - 1)
-        {
-            //out << ca->threadID << "," << ",
+            if (msgInBuf % FILE_BUFSIZE == FILE_BUFSIZE - 1)
+            {
+                pthread_mutex_lock(&ca->fileMutex);
+                for (size_t j = 0; j < FILE_BUFSIZE; j++)
+                {
+                    ca->out << threadID << "," << i << "," << ca->size << "," 
+                            << roundTrips[j];
+                }
+                pthread_mutex_unlock(&ca->fileMutex);
+            }
         }
 #endif
 
@@ -149,7 +169,7 @@ void* requestData(void* args)
     return timeToComplete;
 }
 
-void runClients(struct clientArgs* args, int clients) 
+void runClients(struct clientArgs* ca, int clients) 
 {
     std::vector<pthread_t> threads;
     threads.resize(clients);
@@ -165,10 +185,13 @@ void runClients(struct clientArgs* args, int clients)
     double* timeToComplete = 0;
     double totalTime = 0;
     double averageTime = 0;
+    std::pair<struct clientArgs*, int>* args 
+            = new std::pair<struct clientArgs*, int>();
+    args->first = ca;
     
     for (i = 0; i < clients; i++)
     {
-        args->threadID = i;
+        args->second = i;
 
         if ((rtn = pthread_create(&threads[i], NULL, &requestData, 
                         (void*) args)))
@@ -232,32 +255,37 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    struct clientArgs* args = new clientArgs;
+    struct clientArgs args;
 
-    args->host = vm["host"].as<std::string>();
-    args->port = vm["port"].as<int>();
-    args->size = vm["message-size"].as<int>();
-    args->count = vm["message-count"].as<int>();
+    args.host = vm["host"].as<std::string>();
+    args.port = vm["port"].as<int>();
+    args.size = vm["message-size"].as<int>();
+    args.count = vm["message-count"].as<int>();
     clients = vm["clients"].as<int>();
 
-    std::cout << "Host:\t\t\t" << args->host << "\n";
-    std::cout << "Port:\t\t\t" << args->port << "\n";
-    std::cout << "Message size:\t\t" << args->size << "\n";
-    std::cout << "Message count:\t\t" << args->count << "\n";
+    std::cout << "Host:\t\t\t" << args.host << "\n";
+    std::cout << "Port:\t\t\t" << args.port << "\n";
+    std::cout << "Message size:\t\t" << args.size << "\n";
+    std::cout << "Message count:\t\t" << args.count << "\n";
     std::cout << "Number of clients:\t" << clients << "\n";
 
 #ifdef STATS
-    std::ofstream out(OUT_FILE);
-    if (!out)
+    args.out.open(OUT_FILE);
+    if (!args.out)
     {
         std::cerr << "unable to open \"" << OUT_FILE << "\"\n";
         exit(1);
     }
-    out << "Thread ID,Seconds,Message Size";
+    args.out << "Thread ID,Message Count,Message Size,Seconds";
+
+    if (pthread_mutex_init(&args.fileMutex, NULL))
+    {
+        std::cerr << "Error creating mutex\n";
+        exit(1);
+    }
 #endif
 
-    runClients(args, clients);
-    delete args;
+    runClients(&args, clients);
 
     return 0;
 }

@@ -114,6 +114,7 @@ int main(int argc, char** argv)
     if (pthread_mutex_init(&clientCountMutex, NULL))
     {
         std::cerr << "Error creating mutex\n";
+        exit(1);
     }
     clientCount = 0;
     maxClientCount = 0;
