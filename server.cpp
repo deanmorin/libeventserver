@@ -265,7 +265,6 @@ void handleRequest(void* args)
     int rtn = recv(fd, &peek, 1, MSG_PEEK);
     if (rtn == -1 || rtn == 0)
     {
-        close(fd);
         return;
     }
     struct evbuffer *input = bufferevent_get_input(bev);
@@ -391,7 +390,7 @@ void readSockTh(void* args)
 
         delete writeBuf;
     }
-    close(fd);
+    close(*fd);
     decrementClients(*fd);
     delete fd;
 }
