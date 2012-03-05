@@ -29,10 +29,8 @@ struct clientArgs {
     uint32_t size;
     int count;
     double timeout;
-#ifdef STATS
     std::ofstream out;
     pthread_mutex_t fileMutex;
-#endif
 };
 
 void* requestData(void* args)
@@ -101,7 +99,6 @@ void* requestData(void* args)
         exit(sockError("gettimeofday()", 0));
     }
 
-#ifdef STATS
     struct timeval sendTime;
     struct timeval recvTime;
     double roundTrips[FILE_BUFSIZE];
@@ -109,12 +106,10 @@ void* requestData(void* args)
 	size_t lastMsgNo[FILE_BUFSIZE];
     size_t msgInBuf = 0;
     double requestTime = 0;
-#endif
 
     // transmit request and receive packets
     for (i = 0; i < ca->count; i++)
     {
-#ifdef STATS
         if (i % MSG_PER_RECORD == 0) 
         {
             if (gettimeofday(&sendTime, NULL) == -1)
@@ -122,7 +117,6 @@ void* requestData(void* args)
                 exit(sockError("gettimeofday()", 0));
             }
         }
-#endif
         if (send(sock, requestMsg, REQUEST_SIZE, flag) < 0)
         {
             perror("send() failed");
@@ -130,7 +124,6 @@ void* requestData(void* args)
         }
         clearSocket(sock, responseMsg, bytesToRead);
 
-#ifdef STATS
         if (i % MSG_PER_RECORD == MSG_PER_RECORD - 1 || i == ca->count - 1)
         {
             if (gettimeofday(&recvTime, NULL) == -1)
@@ -163,7 +156,6 @@ void* requestData(void* args)
                 msgInBuf = 0;
             }
         }
-#endif
 
     }
     close(sock);
@@ -289,7 +281,6 @@ int main(int argc, char** argv)
     std::cout << "Number of clients:\t" << clients << "\n";
     std::cout << "Seconds to wait:\t" << args.timeout << "\n";
 
-#ifdef STATS
     args.out.open(OUT_FILE);
     if (!args.out)
     {
@@ -303,13 +294,10 @@ int main(int argc, char** argv)
         std::cerr << "Error creating mutex\n";
         exit(1);
     }
-#endif
 
     runClients(&args, clients);
 
-#ifdef STATS
     args.out.close();
-#endif
     return 0;
 }
 

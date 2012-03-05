@@ -4,7 +4,6 @@ client = client
 compiler = g++
 flags = -W -Wall -pedantic
 dflags = -g -DDEBUG -DUSE_DEBUG
-sflags = -DSTATS
 lib = -lboost_program_options-mt -lpthread
 cmp = $(compiler) $(flags) $(inc) -c
 lnk = $(compiler) $(flags) $(lib) -o $(bin)
@@ -18,9 +17,6 @@ all : $(server) $(client)
 
 debug : flags += $(dflags)
 debug : $(server) $(client)
-
-stats : flags += $(sflags)
-stats : $(server) $(client)
 
 $(client) : bin = $(client)
 $(client) : client.o
