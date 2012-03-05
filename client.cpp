@@ -19,7 +19,7 @@ using namespace dm;
 
 #define OUT_FILE        "response_times.csv"
 #define FILE_BUFSIZE    10
-#define MSG_PER_RECORD  25
+#define MSG_PER_RECORD  1
 
 double secondsDiff(const timeval& val1, const timeval& val2);
 
@@ -28,6 +28,7 @@ struct clientArgs {
     int port;
     uint32_t size;
     int count;
+    double timeout;
 #ifdef STATS
     std::ofstream out;
     pthread_mutex_t fileMutex;
@@ -107,6 +108,7 @@ void* requestData(void* args)
     size_t firstMsgNo = 1;
 	size_t lastMsgNo[FILE_BUFSIZE];
     size_t msgInBuf = 0;
+    double requestTime = 0;
 #endif
 
     // transmit request and receive packets
@@ -135,10 +137,16 @@ void* requestData(void* args)
             {
                 exit(sockError("gettimeofday()", 0));
             }
-            roundTrips[msgInBuf % FILE_BUFSIZE] 
-                    = secondsDiff(sendTime, recvTime);
+            requestTime = secondsDiff(sendTime, recvTime);
+            roundTrips[msgInBuf % FILE_BUFSIZE] = requestTime;
 			lastMsgNo[msgInBuf % FILE_BUFSIZE] = i + 1;
             msgInBuf++;
+
+            if (requestTime >= ca->timeout)
+            {
+                // quit since the last request took too long
+                i = ca->count -1;
+            }
 
             if (msgInBuf % FILE_BUFSIZE == 0
                 || i == ca->count - 1)
@@ -240,6 +248,8 @@ int main(int argc, char** argv)
          "number of packets to request")
         ("clients,x", po::value<int>(&opt)->default_value(250),
          "number of clients to create")
+        ("timeout,t", po::value<double>(&opt)->default_value(3),
+         "seconds in timeout")
         ("help", "show this message")
     ;
 
@@ -268,6 +278,7 @@ int main(int argc, char** argv)
     args.port = vm["port"].as<int>();
     args.size = vm["message-size"].as<int>();
     args.count = vm["message-count"].as<int>();
+    args.timeout = vm["timeout"].as<double>();
     clients = vm["clients"].as<int>();
 
     std::cout << "Host:\t\t\t" << args.host << "\n";
@@ -275,6 +286,7 @@ int main(int argc, char** argv)
     std::cout << "Message size:\t\t" << args.size << "\n";
     std::cout << "Message count:\t\t" << args.count << "\n";
     std::cout << "Number of clients:\t" << clients << "\n";
+    std::cout << "Seconds to wait:\t" << args.timeout << "\n";
 
 #ifdef STATS
     args.out.open(OUT_FILE);
