@@ -67,6 +67,7 @@ void incrementClients(evutil_socket_t fd, struct sockaddr_in* sa);
 void decrementClients(evutil_socket_t fd);
 
 pthread_mutex_t clientMutex;
+pthread_mutex_t jobMutex;
 int clientCount;
 int maxClientCount;
 std::map<evutil_socket_t, struct client> clients;
@@ -120,6 +121,11 @@ int main(int argc, char** argv)
     queue = vm["max-queue"].as<int>();
     
     if (pthread_mutex_init(&clientMutex, NULL))
+    {
+        std::cerr << "Error creating mutex\n";
+        exit(1);
+    }
+    if (pthread_mutex_init(&jobMutex, NULL))
     {
         std::cerr << "Error creating mutex\n";
         exit(1);
@@ -272,25 +278,24 @@ static void sockEvent(struct bufferevent* bev, short events, void* arg)
     {
         decrementClients(bufferevent_getfd(bev));
 
-        pthread_mutex_lock(&clientMutex);
+        pthread_mutex_lock(&jobMutex);
 
         cancelJobs((tPool*)arg, bev);
         bufferevent_free(bev);
 
-        pthread_mutex_unlock(&clientMutex);
+        pthread_mutex_unlock(&jobMutex);
     }
 }
 
 void handleRequest(void* args)
 {
-    pthread_mutex_lock(&clientMutex);
+    pthread_mutex_lock(&jobMutex);
     if (!args)
     {
         // bufferevent has been freed; this is a stale job
-        pthread_mutex_unlock(&clientMutex);
+        pthread_mutex_unlock(&jobMutex);
         return;
     }
-    pthread_mutex_unlock(&clientMutex);
 
     struct bufferevent* bev = (struct bufferevent*) args;
     evutil_socket_t fd = bufferevent_getfd(bev);
@@ -311,11 +316,11 @@ void handleRequest(void* args)
     {
         buf[i] = rand() % 93 + 33;
     }
-
     evbuffer_add(output, buf, msgSize);
 
-    updateClientStats(fd, msgSize);
+    pthread_mutex_unlock(&jobMutex);
 
+    updateClientStats(fd, msgSize);
     delete[] buf;
 }
 
