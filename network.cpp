@@ -18,7 +18,7 @@ int clearSocket(int fd, char* buf, int bufsize)
             if (errno != EAGAIN)
             {
                 sockError("recv()", 0);
-                return -1
+                return -1;
             }
 #ifdef DEBUG
             sockError("recv()", 0);
