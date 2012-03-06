@@ -242,7 +242,26 @@ void handleSigint(evutil_socket_t, short, void* arg)
     shutDown(0);
 }
 
-static void sockEvent(struct bufferevent* bev, short events, void*)
+void cancelJobs(tPool* tpool, struct bufferevent* bev)
+{
+    pthread_mutex_lock(&tpool->queueLock);
+
+    tPoolJob* currentJob = tpool->queueHead;
+    struct bufferevent* currentBev;
+
+    while(currentJob->next != NULL)
+    {
+        currentBev = (struct bufferevent*) currentJob->arg;
+        if (currentBev == bev)
+        {
+            currentJob->arg = NULL;
+        }
+    }
+
+    pthread_mutex_unlock(&tpool->queueLock);
+}
+
+static void sockEvent(struct bufferevent* bev, short events, void* arg)
 {
     if (events & BEV_EVENT_ERROR)
     {
@@ -251,27 +270,34 @@ static void sockEvent(struct bufferevent* bev, short events, void*)
     if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) 
     {
         decrementClients(bufferevent_getfd(bev));
+        cancelJobs((tPool*)arg, bev);
         bufferevent_free(bev);
     }
 }
 
 void handleRequest(void* args)
 {
+    if (!args)
+    {
+        // bufferevent has been freed; this is a stale job
+        return;
+    }
     struct bufferevent* bev = (struct bufferevent*) args;
-    char peek;
+
+    //char peek;
     evutil_socket_t fd = bufferevent_getfd(bev);
 
     //client may have disconnected
-    int rtn = recv(fd, &peek, 1, MSG_PEEK);
-    if (rtn == -1 && errno != EAGAIN)
-    {
-        sockError("peek", 0);
-        return;
-    }
-    else if (rtn == 0)
-    {
-        return;
-    }
+    //int rtn = recv(fd, &peek, 1, MSG_PEEK);
+    //if (rtn == -1 && errno != EAGAIN)
+    //{
+        //sockError("peek", 0);
+        //return;
+    //}
+    //else if (rtn == 0)
+    //{
+        //return;
+    //}
     struct evbuffer *input = bufferevent_get_input(bev);
     struct evbuffer *output = bufferevent_get_output(bev);
     uint32_t msgSize;
