@@ -270,35 +270,30 @@ static void sockEvent(struct bufferevent* bev, short events, void* arg)
     }
     if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) 
     {
+        pthread_mutex_lock(&clientMutex);
+
         decrementClients(bufferevent_getfd(bev));
         cancelJobs((tPool*)arg, bev);
         bufferevent_free(bev);
+
+        pthread_mutex_unlock(&clientMutex);
     }
 }
 
 void handleRequest(void* args)
 {
+    pthread_mutex_lock(&clientMutex);
     if (!args)
     {
         // bufferevent has been freed; this is a stale job
+        pthread_mutex_unlock(&clientMutex);
         return;
     }
-    struct bufferevent* bev = (struct bufferevent*) args;
+    pthread_mutex_unlock(&clientMutex);
 
-    //char peek;
+    struct bufferevent* bev = (struct bufferevent*) args;
     evutil_socket_t fd = bufferevent_getfd(bev);
 
-    //client may have disconnected
-    //int rtn = recv(fd, &peek, 1, MSG_PEEK);
-    //if (rtn == -1 && errno != EAGAIN)
-    //{
-        //sockError("peek", 0);
-        //return;
-    //}
-    //else if (rtn == 0)
-    //{
-        //return;
-    //}
     struct evbuffer *input = bufferevent_get_input(bev);
     struct evbuffer *output = bufferevent_get_output(bev);
     uint32_t msgSize;
