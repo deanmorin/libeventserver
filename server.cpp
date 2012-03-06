@@ -266,7 +266,7 @@ void handleRequest(void* args)
     int rtn = recv(fd, &peek, 1, MSG_PEEK);
     if (rtn == -1)
     {
-        sockErr("peek", 0);
+        sockError("peek", 0);
         return;
     }
     if (rtn == 0)
