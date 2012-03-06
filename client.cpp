@@ -29,6 +29,7 @@ struct clientArgs {
     int count;
     double timeout;
     int msgCount;
+    int writeToFile;
     std::ofstream out;
     pthread_mutex_t fileMutex;
 };
@@ -110,7 +111,7 @@ void* requestData(void* args)
     // transmit request and receive packets
     for (i = 0; i < ca->count; i++)
     {
-        if (i % ca->msgCount == 0)
+        if (ca->writeToFile && i % ca->msgCount == 0)
         {
             if (gettimeofday(&sendTime, NULL) == -1)
             {
@@ -124,7 +125,8 @@ void* requestData(void* args)
         }
         clearSocket(sock, responseMsg, bytesToRead);
 
-        if (i % ca->msgCount == ca->msgCount - 1 || i == ca->count - 1)
+        if (ca->writeToFile &&
+                (i % ca->msgCount == ca->msgCount - 1 || i == ca->count - 1))
         {
             if (gettimeofday(&recvTime, NULL) == -1)
             {
@@ -241,9 +243,11 @@ int main(int argc, char** argv)
          "number of packets to request")
         ("clients,x", po::value<int>(&opt)->default_value(250),
          "number of clients to create")
+        ("write-to-file,w", po::value<int>(&opt)->default_value(1),
+         "write response time to disk (0 to disable)")
         ("record-size,r", po::value<int>(&opt)->default_value(1),
          "number of responses in each output record")
-        ("timeout,t", po::value<double>(&dopt)->default_value(3),
+        ("timeout,t", po::value<double>(&dopt)->default_value(10),
          "seconds in timeout")
         ("help", "show this message")
     ;
@@ -275,6 +279,7 @@ int main(int argc, char** argv)
     args.count = vm["message-count"].as<int>();
     args.timeout = vm["timeout"].as<double>();
     args.msgCount = vm["record-size"].as<int>();
+    args.writeToFile = vm["write-to-file"].as<int>();
     clients = vm["clients"].as<int>();
 
     std::cout << "Host:\t\t\t" << args.host << "\n";
@@ -282,7 +287,8 @@ int main(int argc, char** argv)
     std::cout << "Message size:\t\t" << args.size << "\n";
     std::cout << "Message count:\t\t" << args.count << "\n";
     std::cout << "Number of clients:\t" << clients << "\n";
-    std::cout << "Record Size:\t\t" << args.msgCount << "\n";
+    std::cout << "Write to file:\t\t" << args.writeToFile << "\n";
+    std::cout << "Record size:\t\t" << args.msgCount << "\n";
     std::cout << "Seconds to wait:\t" << args.timeout << "\n";
 
     args.out.open(OUT_FILE);
