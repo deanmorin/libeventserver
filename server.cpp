@@ -270,9 +270,10 @@ static void sockEvent(struct bufferevent* bev, short events, void* arg)
     }
     if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) 
     {
+        decrementClients(bufferevent_getfd(bev));
+
         pthread_mutex_lock(&clientMutex);
 
-        decrementClients(bufferevent_getfd(bev));
         cancelJobs((tPool*)arg, bev);
         bufferevent_free(bev);
 
