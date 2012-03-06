@@ -19,7 +19,6 @@ using namespace dm;
 
 #define OUT_FILE        "response_times.csv"
 #define FILE_BUFSIZE    10
-#define MSG_PER_RECORD  1
 
 double secondsDiff(const timeval& val1, const timeval& val2);
 
@@ -29,6 +28,7 @@ struct clientArgs {
     uint32_t size;
     int count;
     double timeout;
+    int msgCount;
     std::ofstream out;
     pthread_mutex_t fileMutex;
 };
@@ -110,7 +110,7 @@ void* requestData(void* args)
     // transmit request and receive packets
     for (i = 0; i < ca->count; i++)
     {
-        if (i % MSG_PER_RECORD == 0) 
+        if (i % ca->msgCount == 0)
         {
             if (gettimeofday(&sendTime, NULL) == -1)
             {
@@ -124,7 +124,7 @@ void* requestData(void* args)
         }
         clearSocket(sock, responseMsg, bytesToRead);
 
-        if (i % MSG_PER_RECORD == MSG_PER_RECORD - 1 || i == ca->count - 1)
+        if (i % ca->msgCount == ca->msgCount - 1 || i == ca->count - 1)
         {
             if (gettimeofday(&recvTime, NULL) == -1)
             {
@@ -137,12 +137,12 @@ void* requestData(void* args)
 
             if (requestTime >= ca->timeout)
             {
-                // quit since the last request took too long
                 i = ca->count -1;
+                std::cerr << "Server took too long to respond to request\n";
+                break;
             }
 
-            if (msgInBuf % FILE_BUFSIZE == 0
-                || i == ca->count - 1)
+            if (msgInBuf % FILE_BUFSIZE == 0 || i == ca->count - 1)
             {
                 pthread_mutex_lock(&ca->fileMutex);
                 for (size_t j = 0; j < msgInBuf; j++)
@@ -241,6 +241,8 @@ int main(int argc, char** argv)
          "number of packets to request")
         ("clients,x", po::value<int>(&opt)->default_value(250),
          "number of clients to create")
+        ("record-size,r", po::value<int>(&opt)->default_value(1),
+         "number of responses in each output record")
         ("timeout,t", po::value<double>(&dopt)->default_value(3),
          "seconds in timeout")
         ("help", "show this message")
@@ -272,6 +274,7 @@ int main(int argc, char** argv)
     args.size = vm["message-size"].as<int>();
     args.count = vm["message-count"].as<int>();
     args.timeout = vm["timeout"].as<double>();
+    args.msgCount = vm["record-size"].as<int>();
     clients = vm["clients"].as<int>();
 
     std::cout << "Host:\t\t\t" << args.host << "\n";
@@ -279,6 +282,7 @@ int main(int argc, char** argv)
     std::cout << "Message size:\t\t" << args.size << "\n";
     std::cout << "Message count:\t\t" << args.count << "\n";
     std::cout << "Number of clients:\t" << clients << "\n";
+    std::cout << "Record Size:\t\t" << args.msgCount << "\n";
     std::cout << "Seconds to wait:\t" << args.timeout << "\n";
 
     args.out.open(OUT_FILE);
