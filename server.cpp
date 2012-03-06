@@ -249,13 +249,14 @@ void cancelJobs(tPool* tpool, struct bufferevent* bev)
     tPoolJob* currentJob = tpool->queueHead;
     struct bufferevent* currentBev;
 
-    while(currentJob->next != NULL)
+    while(currentJob != NULL)
     {
         currentBev = (struct bufferevent*) currentJob->arg;
         if (currentBev == bev)
         {
             currentJob->arg = NULL;
         }
+        currentJob = currentJob->next;
     }
 
     pthread_mutex_unlock(&tpool->queueLock);
